@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#221938">
+  <meta name="description" content="Roll a Melbourne train trip, log your rides and collect badges.">
+  <title>RTGdle — Melbourne train game</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="network.js" defer></script>
+  <script src="game.js" defer></script>
+  <script src="app.js" defer></script>
+  <script src="firebase-config.js" defer></script>
+  <script src="account.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="shell top-inner">
+      <a class="brand" href="#daily"><span class="logo" aria-hidden="true">↠</span> RTGdle<span class="brand-dot">.</span></a>
+      <nav aria-label="Game">
+        <a href="#daily" data-page="daily">Daily draw</a>
+        <a href="#log" data-page="log">Log a ride</a>
+        <a href="#collection" data-page="collection">Collection</a>
+        <a href="#badges" data-page="badges">Badges</a>
+        <a href="#account" data-page="account" id="account-link">Sign in</a>
+      </nav>
+    </div>
+  </header>
+  <main class="shell">
+    <section id="daily" aria-labelledby="daily-title">
+      <div class="intro">
+        <div><p class="eyebrow"><span class="signal"></span> MELBOURNE TRAIN GAME</p><h1 id="daily-title">Daily draw<span>.</span></h1></div>
+        <p class="date" id="date"></p>
+      </div>
+      <div class="layout">
+        <article class="board" aria-labelledby="draw-heading">
+          <div class="board-top"><span><span class="signal"></span> DEPARTURE BOARD</span><span id="draw-state">READY TO DRAW</span></div>
+          <div class="board-content" id="draw-content" aria-live="polite"></div>
+          <div class="board-bottom"><button id="generate" class="primary">Generate trip <span aria-hidden="true">↗</span></button><span id="reset-note">One draw per Melbourne day.</span></div>
+        </article>
+        <aside class="ticket">
+          <p class="eyebrow">YOUR COLLECTION</p>
+          <div class="total" id="badge-count">0</div>
+          <h2 id="badge-label">Badges unlocked</h2>
+          <div class="ticket-bottom"><a class="text-link" href="#collection">View collection <span aria-hidden="true">↗</span></a></div>
+        </aside>
+      </div>
+      <div class="below" id="daily-badges"></div>
+      <div class="ride-prompt"><div><h2>Been on a train today?</h2><p>Record your stations, train model and ticket.</p></div><a class="outline" href="#log">Log a ride <span aria-hidden="true">↗</span></a></div>
+    </section>
+    <section id="log" aria-labelledby="log-title" hidden>
+      <div class="intro"><div><p class="eyebrow"><span class="signal"></span> YOUR RIDES</p><h1 id="log-title">Log a ride<span>.</span></h1></div></div>
+      <p class="lead">Record one direct train leg from a ride you took.</p>
+      <form class="panel form" id="ride-form">
+        <label class="wide">Train line<select id="line" required></select></label>
+        <label>From<select id="from" required></select></label>
+        <label>To<select id="to" required></select></label>
+        <label>Train model<select id="train-model"></select></label>
+        <label>Ticket used<select id="ticket"><option value="">Unspecified</option><option value="myki">myki</option><option value="paper">Paper ticket</option><option value="other">Other</option></select></label>
+        <div class="wide form-actions"><button class="primary" type="submit">Save ride <span aria-hidden="true">↗</span></button><p id="form-status" role="status"></p></div>
+      </form>
+      <div class="below" id="ride-badges"></div>
+    </section>
+    <section id="collection" aria-labelledby="collection-title" hidden>
+      <div class="intro"><div><p class="eyebrow"><span class="signal"></span> YOUR PROGRESS</p><h1 id="collection-title">Collection<span>.</span></h1></div></div>
+      <div id="collection-content"></div>
+    </section>
+    <section id="badges" aria-labelledby="badges-title" hidden>
+      <div class="intro"><div><h1 id="badges-title">Badges<span>.</span></h1></div></div>
+      <p class="badge-note">Train model rarity reflects published fleet sizes and rollout status. Draw odds depend on the models available on each line.</p>
+      <div id="badge-catalogue"></div>
+    </section>
+    <section id="account" aria-labelledby="account-title" hidden>
+      <div class="intro"><div><h1 id="account-title">Account<span>.</span></h1></div></div>
+      <div class="panel account-panel">
+        <p>Your trips and badges are saved in this browser.</p>
+        <p id="account-status" role="status">Checking sign-in availability…</p>
+        <button id="google-sign-in" class="primary" type="button" hidden>Sign in with Google</button>
+        <button id="sign-out" class="outline" type="button" hidden>Sign out</button>
+      </div>
+    </section>
+    <footer><span>RTGdle · Melbourne</span><details><summary>Game data</summary><p>Metro and V/Line stopping patterns use a November 2026 <a href="https://opendata.transport.vic.gov.au/dataset/gtfs-schedule">Transport Victoria timetable snapshot</a>. Train models use line-level fleet pools. Check current timetables before travelling.</p><p>Badge tiers and quiet-station picks are provisional. Progress is saved in this browser.</p></details></footer>
+  </main>
+</body>
+</html>
