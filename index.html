@@ -6,6 +6,47 @@
   <meta name="theme-color" content="#221938">
   <meta name="description" content="Roll a Melbourne train trip, log your rides and collect badges.">
   <title>RTGdle — Melbourne train game</title>
+  <script>
+    (() => {
+      const key = 'rtgdle-theme';
+      const choices = ['auto', 'light', 'dark'];
+      const system = window.matchMedia('(prefers-color-scheme: dark)');
+      let choice = 'auto';
+      try {
+        const saved = localStorage.getItem(key);
+        if (choices.includes(saved)) choice = saved;
+      } catch {
+        // The theme can still be changed if browser storage is unavailable.
+      }
+
+      function applyTheme() {
+        const theme = choice === 'auto' ? (system.matches ? 'dark' : 'light') : choice;
+        document.documentElement.dataset.theme = theme;
+      }
+
+      applyTheme();
+      system.addEventListener('change', applyTheme);
+      document.addEventListener('DOMContentLoaded', () => {
+        const control = document.getElementById('theme');
+        control.value = choice;
+        control.addEventListener('change', () => {
+          choice = control.value;
+          applyTheme();
+          try {
+            localStorage.setItem(key, choice);
+          } catch {
+            // The preference still applies for this page visit.
+          }
+        });
+        window.addEventListener('storage', event => {
+          if (event.key !== key && event.key !== null) return;
+          choice = choices.includes(event.newValue) ? event.newValue : 'auto';
+          control.value = choice;
+          applyTheme();
+        });
+      });
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
   <script src="network.js" defer></script>
   <script src="game.js" defer></script>
@@ -23,6 +64,13 @@
         <a href="#collection" data-page="collection">Collection</a>
         <a href="#badges" data-page="badges">Badges</a>
         <a href="#account" data-page="account" id="account-link">Sign in</a>
+        <label class="theme-control" for="theme">Theme
+          <select id="theme">
+            <option value="auto">Auto</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
       </nav>
     </div>
   </header>
