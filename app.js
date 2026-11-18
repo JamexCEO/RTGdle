@@ -1,6 +1,10 @@
 const byId = id => document.getElementById(id);
 const { badges, lines, models, getLine, getDestinations, dayKey, score, draw } = RailGame;
-const storageKey = 'raildle-trips-v1';
+let accountStore = null;
+let accountLoading = true;
+let guestRoll = null;
+let accountGeneration = 0;
+let accountTrips = [];
 const dateLabel = new Intl.DateTimeFormat('en-AU', {
   timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long'
 });
@@ -16,17 +20,26 @@ const catalogue = Object.keys(badges).sort((a, b) =>
 const pause = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
 function loadTrips() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(storageKey));
-    return Array.isArray(stored) ? stored.filter(trip => trip && score(trip).length) : [];
-  } catch {
-    return [];
-  }
+  return accountStore ? accountTrips.filter(trip => score(trip).length) : [];
 }
 
-function saveTrip(trip, trips) {
-  localStorage.setItem(storageKey, JSON.stringify([{ ...trip, networkVersion: 1 }, ...trips]));
-}
+window.addEventListener('account-change', event => {
+  accountGeneration++;
+  accountStore = event.detail.store;
+  accountLoading = event.detail.loading;
+  accountTrips = event.detail.trips ?? [];
+  guestRoll = null;
+  lastRide = null;
+  render();
+});
+window.addEventListener('account-progress', event => {
+  if (accountStore !== event.detail.store) accountGeneration++;
+  accountStore = event.detail.store;
+  accountLoading = false;
+  accountTrips = event.detail.trips;
+  guestRoll = null;
+  render();
+});
 
 function badgeList(ids, unlocked) {
   return '<div class="badge-grid">' + ids.map(id => {
@@ -51,14 +64,17 @@ function render() {
   if (drawing) return;
   const today = dayKey();
   const trips = loadTrips();
-  const daily = trips.find(trip => trip.mode === 'draw' && trip.date === today);
+  const daily = trips.find(trip => trip.mode === 'draw' && trip.date === today) ??
+    (!accountStore && guestRoll?.date === today ? guestRoll : null);
   const unlocked = [...new Set(trips.flatMap(scoreSavedTrip))];
   renderedDay = today;
   byId('date').textContent = dateLabel.format(new Date(today));
   byId('badge-count').textContent = unlocked.length + ' / ' + Object.keys(badges).length;
-  byId('generate').disabled = Boolean(daily);
+  byId('generate').disabled = Boolean(daily) || accountLoading;
   byId('draw-state').textContent = daily ? 'DRAW COMPLETE' : 'READY TO DRAW';
-  byId('reset-note').textContent = daily ? 'Next draw at midnight in Melbourne.' : 'One draw per Melbourne day.';
+  byId('reset-note').textContent = accountLoading ? 'Loading account progress…' :
+    accountStore ? (daily ? 'Next draw at midnight in Melbourne.' : 'One account draw per Melbourne day.') :
+    'Guest draw · temporary result. Sign in before drawing to save progress.';
   const line = daily && getLine(daily.line);
   byId('draw-content').innerHTML = daily
     ? '<p class="board-kicker">' + line.name + ' line' + (line.eventOnly ? ' · Event service' : '') +
@@ -117,6 +133,8 @@ async function revealTrip(trip) {
 }
 
 function renderCollection(unlocked, trips) {
+  const xp = trips.reduce((total, trip) =>
+    total + scoreSavedTrip(trip).reduce((points, id) => points + badges[id].points, 0), 0);
   const history = trips.map(trip => {
     const line = getLine(trip.line);
     const day = new Date(trip.date);
@@ -126,7 +144,8 @@ function renderCollection(unlocked, trips) {
       (trip.mode === 'draw' ? 'Daily draw' : 'Logged ride') + '</strong><small>' + date + '</small></span></li>';
   });
   byId('collection-content').innerHTML =
-    '<div class="section-heading"><h2>Unlocked badges</h2><span>' + unlocked.length + ' of ' +
+    '<div class="section-heading"><h2>' + xp.toLocaleString('en-AU') +
+    ' XP</h2></div><div class="section-heading"><h2>Unlocked badges</h2><span>' + unlocked.length + ' of ' +
     Object.keys(badges).length + '</span></div>' +
     (unlocked.length ? badgeList(unlocked) : '<p class="panel empty">Generate a trip or log a ride to unlock your first badge.</p>') +
     '<div class="section-heading history-heading"><h2>Trip history</h2></div>' +
@@ -134,7 +153,7 @@ function renderCollection(unlocked, trips) {
 }
 
 function showPage() {
-  const pages = ['daily', 'log', 'collection', 'badges', 'account'];
+  const pages = ['daily', 'log', 'collection', 'badges', 'account', 'friends'];
   const hash = location.hash.slice(1);
   const page = pages.includes(hash) ? hash : 'daily';
   for (const id of pages) {
@@ -173,21 +192,21 @@ function setDestinations() {
 }
 
 byId('generate').addEventListener('click', async () => {
-  if (drawing) return;
+  if (drawing || accountLoading) return;
+  const generation = accountGeneration;
+  const store = accountStore;
   drawing = true;
   byId('generate').disabled = true;
-  const generate = () => {
-    const trips = loadTrips();
-    const date = dayKey();
-    if (trips.some(trip => trip.mode === 'draw' && trip.date === date)) return;
-    const trip = draw(date);
-    saveTrip(trip, trips);
-    return trip;
-  };
   let trip;
   let saveFailed = false;
   try {
-    trip = navigator.locks ? await navigator.locks.request(storageKey, generate) : generate();
+    if (store) {
+      trip = await store.roll();
+    } else if (guestRoll?.date !== dayKey()) {
+      trip = draw(dayKey());
+      guestRoll = trip;
+    }
+    if (generation !== accountGeneration) trip = null;
   } catch {
     saveFailed = true;
   }
@@ -199,7 +218,7 @@ byId('generate').addEventListener('click', async () => {
     drawing = false;
     render();
     board.removeAttribute('aria-busy');
-    if (trip?.date === dayKey() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (generation === accountGeneration && trip?.date === dayKey() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       board.querySelector('.journey').animate([
         { transform: 'scale(.97)', opacity: .75 },
         { transform: 'scale(1)', opacity: 1 }
@@ -212,7 +231,7 @@ byId('generate').addEventListener('click', async () => {
         ], { duration: 360, delay: 180 + index * 160, easing: 'ease-out', fill: 'backwards' });
       }
     }
-    if (saveFailed) byId('reset-note').textContent = 'Could not save the draw. Check browser storage and try again.';
+    if (saveFailed) byId('reset-note').textContent = 'Could not load or save the account draw. Check your connection and Firebase setup.';
   }
 });
 
@@ -229,16 +248,20 @@ byId('line').addEventListener('change', setStations);
 byId('from').addEventListener('change', setDestinations);
 byId('ride-form').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!accountStore || accountLoading) {
+    byId('form-status').textContent = 'Sign in to save rides and earn collection points.';
+    return;
+  }
+  const generation = accountGeneration;
   const trip = { mode: 'ride', date: dayKey(), line: byId('line').value, from: byId('from').value,
     to: byId('to').value, model: byId('train-model').value, ticket: byId('ticket').value };
   if (!score(trip).length) {
     byId('form-status').textContent = 'Choose two different stations and a compatible train model or Unknown.';
     return;
   }
-  const save = () => saveTrip(trip, loadTrips());
   try {
-    if (navigator.locks) await navigator.locks.request(storageKey, save);
-    else save();
+    await accountStore.saveRide(trip);
+    if (generation !== accountGeneration) return;
     lastRide = { ...trip, networkVersion: 1 };
     event.target.reset();
     setStations();
@@ -250,9 +273,6 @@ byId('ride-form').addEventListener('submit', async event => {
 });
 
 window.addEventListener('hashchange', showPage);
-window.addEventListener('storage', event => {
-  if (event.key === storageKey || event.key === null) render();
-});
 window.setInterval(() => {
   if (renderedDay !== dayKey()) render();
 }, 1000);

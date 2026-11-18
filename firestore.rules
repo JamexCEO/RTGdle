@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function firstSunday(year, month) {
+      let day = int(timestamp.date(year, month, 1).toMillis() / 86400000);
+      return 1 + (7 - ((day + 4) % 7)) % 7;
+    }
+    function melbourneTime() {
+      let year = request.time.year();
+      let end = timestamp.date(year, 4, firstSunday(year, 4)) - duration.value(8, 'h');
+      let start = timestamp.date(year, 10, firstSunday(year, 10)) - duration.value(8, 'h');
+      let daylight = request.time < end || request.time >= start;
+      return request.time + duration.value(daylight ? 11 : 10, 'h');
+    }
+    function dateString(time) {
+      return string(time.year()) + '-' +
+        (time.month() < 10 ? '0' : '') + string(time.month()) + '-' +
+        (time.day() < 10 ? '0' : '') + string(time.day());
+    }
+    function validTrip(mode) {
+      let data = request.resource.data;
+      let trip = data.trip;
+      return data.keys().hasOnly(['trip', 'createdAt']) &&
+        data.createdAt == request.time &&
+        trip.keys().hasOnly(['mode', 'date', 'line', 'model', 'from', 'to', 'ticket', 'networkVersion']) &&
+        trip.mode == mode && trip.date == dateString(melbourneTime()) &&
+        trip.line is string && trip.from is string && trip.to is string &&
+        trip.from != trip.to && trip.networkVersion == 1 &&
+        trip.line.size() <= 40 && trip.from.size() <= 100 && trip.to.size() <= 100;
+    }
+    match /users/{uid}/draws/{day} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && validTrip('draw') &&
+        day == string(int(melbourneTime().toMillis() / 86400000));
+    }
+    match /users/{uid}/rides/{ride} {
+      allow read: if owner(uid);
+      allow create: if owner(uid) && validTrip('ride');
+    }
+    match /profiles/{uid} {
+      allow get: if signedIn();
+      function validProfile() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['username', 'changes']) &&
+          data.username is string && data.username.matches('^[a-z0-9_]{3,20}$') &&
+          getAfter(/databases/$(database)/documents/usernames/$(data.username)).data.uid == uid;
+      }
+      allow create: if owner(uid) && validProfile() && request.resource.data.changes == 0;
+      allow update: if owner(uid) && validProfile() && resource.data.changes == 0 &&
+        request.resource.data.changes == 1 &&
+        request.resource.data.username != resource.data.username &&
+        !existsAfter(/databases/$(database)/documents/usernames/$(resource.data.username));
+    }
+    match /usernames/{name} {
+      allow get: if signedIn();
+      allow create: if signedIn() && request.resource.data.keys().hasOnly(['uid']) &&
+        request.resource.data.uid == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.username == name;
+      allow delete: if owner(resource.data.uid) &&
+        getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.username != name;
+    }
+    match /friendships/{id} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      // Transactions may check for an absent request at its canonical ID.
+      allow get: if signedIn() && !exists(/databases/$(database)/documents/friendships/$(id));
+      allow create: if signedIn() &&
+        request.resource.data.keys().hasOnly(['members', 'sender', 'status']) &&
+        request.resource.data.members is list && request.resource.data.members.size() == 2 &&
+        request.resource.data.members[0] < request.resource.data.members[1] &&
+        id == request.resource.data.members[0] + '_' + request.resource.data.members[1] &&
+        request.auth.uid in request.resource.data.members &&
+        request.resource.data.sender == request.auth.uid && request.resource.data.status == 'pending' &&
+        exists(/databases/$(database)/documents/profiles/$(request.resource.data.members[0])) &&
+        exists(/databases/$(database)/documents/profiles/$(request.resource.data.members[1]));
+      allow update: if signedIn() && request.auth.uid in resource.data.members &&
+        request.auth.uid != resource.data.sender && resource.data.status == 'pending' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+        request.resource.data.status == 'accepted';
+      allow delete: if signedIn() && request.auth.uid in resource.data.members;
+    }
+  }
+}

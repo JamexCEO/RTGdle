@@ -63,6 +63,7 @@
         <a href="#log" data-page="log">Log a ride</a>
         <a href="#collection" data-page="collection">Collection</a>
         <a href="#badges" data-page="badges">Badges</a>
+        <a href="#friends" data-page="friends">Friends</a>
         <a href="#account" data-page="account" id="account-link">Sign in</a>
         <label class="theme-control" for="theme">Theme
           <select id="theme">
@@ -121,10 +122,24 @@
     <section id="account" aria-labelledby="account-title" hidden>
       <div class="intro"><div><h1 id="account-title">Account<span>.</span></h1></div></div>
       <div class="panel account-panel">
-        <p>Your trips and badges are saved in this browser.</p>
+        <p>Sign in to save daily draws, rides, badges and XP across devices.</p>
         <p id="account-status" role="status">Checking sign-in availability…</p>
         <button id="google-sign-in" class="primary" type="button" hidden>Sign in with Google</button>
         <button id="sign-out" class="outline" type="button" hidden>Sign out</button>
+        <form id="username-form" hidden>
+          <label>Username<input id="username" minlength="3" maxlength="20" pattern="[a-z0-9_]{3,20}" required autocomplete="off"></label>
+          <p>3–20 lowercase letters, numbers or underscores. You can change it once.</p>
+          <button class="primary" type="submit">Save username</button>
+        </form>
+        <p id="profile-status" role="status"></p>
+      </div>
+    </section>
+    <section id="friends" aria-labelledby="friends-title" hidden>
+      <div class="intro"><div><h1 id="friends-title">Friends<span>.</span></h1></div></div>
+      <div class="panel account-panel">
+        <form id="friend-form"><label>Add by username<input id="friend-name" required pattern="[a-z0-9_]{3,20}" maxlength="20" autocomplete="off"></label><button class="primary" type="submit">Send request</button></form>
+        <p id="friends-status" role="status">Sign in and choose a username to add friends.</p>
+        <div id="friends-list"></div>
       </div>
     </section>
     <footer><span>RTGdle · Melbourne</span><details><summary>Game data</summary><p>Metro and V/Line stopping patterns use a November 2026 <a href="https://opendata.transport.vic.gov.au/dataset/gtfs-schedule">Transport Victoria timetable snapshot</a>. Train models use line-level fleet pools. Check current timetables before travelling.</p><p>Badge tiers and quiet-station picks are provisional. Progress is saved in this browser.</p></details></footer>

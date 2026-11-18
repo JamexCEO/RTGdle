@@ -185,6 +185,10 @@ select:disabled { background: var(--disabled); color: var(--muted); }
 .account-panel { display: grid; justify-items: start; gap: 14px; padding: 23px; max-width: 560px; }
 .account-panel p:first-child { color: var(--muted); }
 .account-panel button:disabled { opacity: .55; cursor: default; }
+.account-panel form { display: grid; gap: 12px; width: 100%; }
+input { font: inherit; color: inherit; background: var(--input); border: 1px solid var(--control-border); border-radius: 7px; padding: 10px 12px; min-width: 0; }
+#friends-list { width: 100%; display: grid; gap: 12px; }
+.friend-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; border-top: 1px solid var(--border); padding-top: 12px; }
 .history { list-style: none; padding: 0 16px; margin: 0; }
 .history li { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 13px 0; }
 .history li + li { border-top: 1px solid var(--border); }
